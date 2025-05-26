@@ -1,0 +1,23 @@
+# We keep this file minimal and install needed packages manually
+python-dotenv
+jupyter
+ipykernel
+tqdm
+numpy
+pandas
+plotly
+matplotlib
+seaborn
+scipy
+tensorflow
+scikit-learn
+statsmodels
+keras
+tf-keras
+beautifulsoup4
+selenium
+requests
+PyPDF2
+xlsxwriter
+openpyxl
+ratelimit
