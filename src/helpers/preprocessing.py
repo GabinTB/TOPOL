@@ -44,19 +44,19 @@ def clean_text(text: str, entities_to_mask: list) -> str:
     return text
 
 
-def get_clean_text(row, max_lenght=20000) -> str:
+def get_clean_text(row, entities_to_mask=["DATE", "TIME", "PERSON", "ORGANIZATION", "NUM", "LOCATION"], max_lenght=20000) -> str:
     text = row['text']
-    text = clean_text(text)
+    text = clean_text(text, entities_to_mask=entities_to_mask)
     words = text.split()
     if len(words) > max_lenght:
         text = ' '.join(words[:max_lenght])
     return text
 
-def get_clean_texts(df: pd.DataFrame, max_lenght=20000, verbose=False) -> list:
+def get_clean_texts(df: pd.DataFrame, entities_to_mask=["DATE", "TIME", "PERSON", "ORGANIZATION", "NUM", "LOCATION"], max_lenght=20000, verbose=False) -> list:
     documents = []
     if verbose:
         for i, row in tqdm(df.iterrows(), total=len(df)):
-            document = get_clean_text(row, max_lenght=max_lenght)
+            document = get_clean_text(row, entities_to_mask=entities_to_mask, max_lenght=max_lenght)
             documents.append(document)
     else:
         return df.apply(get_clean_text, axis=1, max_lenght=max_lenght).values.tolist()

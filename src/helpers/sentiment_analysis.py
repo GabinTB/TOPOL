@@ -4,8 +4,7 @@ from transformers import pipeline
 
 
 class SentimentModel:
-    def __init__(self, tokenizer,
-                 model_name="tabularisai/multilingual-sentiment-analysis", device="mps"):
+    def __init__(self, model_name="tabularisai/multilingual-sentiment-analysis", device="mps"):
         if device == "gpu" and not torch.cuda.is_available():
             print("GPU is not available. Falling back to CPU.")
             device = "cpu"
@@ -15,7 +14,6 @@ class SentimentModel:
         
         self.model = pipeline('sentiment-analysis', model=model_name, top_k=None, device=device)
         self.max_length = self.model.tokenizer.model_max_length
-        self.tokenizer = self.model.tokenizer
 
     def _transform_output(self, output):
         return { s['label']: s['score'] for s in output }
@@ -34,7 +32,7 @@ class SentimentModel:
         Returns:
             List[str]: List of text chunks.
         """
-        encoding = self.tokenizer(text, return_offsets_mapping=True, add_special_tokens=False)
+        encoding = self.model.tokenizer(text, return_offsets_mapping=True, add_special_tokens=False)
         input_ids = encoding["input_ids"]
         offsets = encoding["offset_mapping"]
 
@@ -61,13 +59,13 @@ class SentimentModel:
         
         # sentiments = []
         # for text in texts:
-        chunks = self.split_into_token_chunks(text, max_length=max_length, stride=stride)
+        chunks = self._split_into_token_chunks(text, stride=stride)
         if len(chunks) == 1:
-            return self.transform_output(self.model(chunks[0])[0])
+            return self._transform_output(self.model(chunks[0])[0])
 
         # Get average positive, negative, neutral probabilities for all chunks
         chunk_sentiments = self.model(chunks, verbose=True, max_length=max_length, truncation=False)
-        chunk_sentiments = [self.transform_output(s) for s in chunk_sentiments]
+        chunk_sentiments = [self._transform_output(s) for s in chunk_sentiments]
         return {
             "positive": np.mean([s["positive"] for s in chunk_sentiments]),
             "negative": np.mean([s["negative"] for s in chunk_sentiments]),

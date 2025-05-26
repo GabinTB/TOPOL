@@ -6,6 +6,7 @@ import matplotlib.colors as mcolors
 import matplotlib.lines as mlines
 from matplotlib.cm import ScalarMappable
 import umap
+from umap import UMAP
 from sknetwork.clustering import Leiden
 from scipy.sparse import csr_matrix
 from scipy.sparse import lil_matrix
@@ -20,8 +21,8 @@ get_y = lambda x: np.nan if not isinstance(x, (list, tuple, np.ndarray)) or len(
 class Dataset(object):
     def __init__(self, df: pd.DataFrame):
         assert "text" in df.columns, "Dataframe must contain a 'text' column."
-        assert "embedding" in df.columns, "Dataframe must contain an 'embeddings' column."
-        self.df = pd.dfFrame(columns=["text", "embeddings"])
+        assert "embedding" in df.columns, "Dataframe must contain an 'embedding' column."
+        self.df = df.copy()
         self.df["reduced_embedding"] = None
         self.df["2D_embedding"] = None
         self.df["cluster"] = None
@@ -30,8 +31,8 @@ class Dataset(object):
 
 class TopolModeling:
     def __init__(self, n_components, umap_model_params, leiden_model_params, vectorizer_model, supervised=False):
-        self.umap_model = umap.UMAP(n_components=n_components, **umap_model_params)
-        self.umap_2D_model = umap.UMAP(n_components=2, **umap_model_params)
+        self.umap_model = UMAP(n_components=n_components, **umap_model_params)
+        self.umap_2D_model = UMAP(n_components=2, **umap_model_params)
         self.leiden_model = Leiden(**leiden_model_params)
         self.vectorizer_model = vectorizer_model
         self.supervised = supervised
@@ -59,6 +60,8 @@ class TopolModeling:
             self.dataset_B.df["2D_embedding"] = self.umap_2D_model.transform(embeddings_B)
 
     def _apply_leiden(self):
+
+        # Create graph
         if self.supervised: # Known polarity separation
             self.graph = self.umap_model.graph_
         else: # Unsupervised polarity separation
@@ -93,6 +96,7 @@ class TopolModeling:
             bottom = hstack([cross_edges, graph_B])
             self.graph = vstack([top, bottom])
 
+        # Apply Leiden clustering on the network
         self.adjacency_matrix = csr_matrix(self.graph)
         labels_A_B = self.leiden_model.fit_predict(self.adjacency_matrix)
         probs_A_B = self.leiden_model.predict_proba()
@@ -106,7 +110,7 @@ class TopolModeling:
         cluster_info = pd.DataFrame({"Cluster": np.unique(df['cluster'])})
         cluster_info["Count"] = cluster_info["Cluster"].map(df["cluster"].value_counts())
         cluster_info["Top_Words"] = cluster_info["Cluster"].apply(
-            lambda x: get_top_n_words(df[df["cluster"] == x]["document"].values.tolist(), 
+            lambda x: get_top_n_words(df[df["cluster"] == x]["text"].values.tolist(), 
                                       self.vectorizer_model,
                                       n=n_top_freq_words)
         )
@@ -115,12 +119,12 @@ class TopolModeling:
             lambda x: np.mean(df[df["cluster"] == x]['embedding'].tolist(), axis=0)
         )
         cluster_info["2D_Centroid"] = cluster_info["Cluster"].apply(
-            lambda x: np.mean(df[df["cluster"] == x]['2D_embeddings'].tolist(), axis=0)
+            lambda x: np.mean(df[df["cluster"] == x]['2D_embedding'].tolist(), axis=0)
         )
         cluster_info["Top_Representative_Docs"] = cluster_info[["Cluster", "Centroid"]].apply(
             lambda x:
                 get_top_n_representative_documents(
-                    df[df["cluster"] == x["Cluster"]]["document"].values.tolist(),
+                    df[df["cluster"] == x["Cluster"]]["text"].values.tolist(),
                     np.stack(df[df["cluster"] == x["Cluster"]]['embedding'].values), 
                     x["Centroid"],
                     n=n_repr_docs
@@ -141,14 +145,16 @@ class TopolModeling:
             top_repr_doc_B = cluster_info_B[cluster_info_B["Cluster"] == cluster_id]["Top_Representative_Docs"].values[0]
             joined_top_repr_doc_B = " ".join(top_repr_doc_B)
 
-            tf_idf_words_A_B = get_tf_idf_top_n_words([joined_top_repr_doc_A, joined_top_repr_doc_B], n=n_top_tf_idf_words)
+            tf_idf_words_A_B = get_tf_idf_top_n_words([joined_top_repr_doc_A, joined_top_repr_doc_B], vectorizer_model=self.vectorizer_model, n=n_top_tf_idf_words)
             idx_A = cluster_info_A[cluster_info_A["Cluster"] == cluster_id].index[0]
             cluster_info_A.at[idx_A, "Top_Words_TFIDF"] = tf_idf_words_A_B[0]
             idx_B = cluster_info_B[cluster_info_B["Cluster"] == cluster_id].index[0]
             cluster_info_B.at[idx_B, "Top_Words_TFIDF"] = tf_idf_words_A_B[1]
+        self.dataset_A.cluster_info = cluster_info_A
+        self.dataset_B.cluster_info = cluster_info_B
 
     def vizualize_clusters(self, figsize=(10, 10)):
-        fig, ax: plt.Axes = plt.subplots(figsize=figsize, layout="constrained")
+        fig, ax = plt.subplots(figsize=figsize, layout="constrained")
          
         # --- Prepare data ---
         clusters_A = self.dataset_A.df["cluster"].unique()
@@ -162,8 +168,8 @@ class TopolModeling:
 
         # --- Plot document embeddings ---
         # Period A
-        scatter_A = ax.scatter(
-            self.dataset_A.df["2D_embeddings"].apply(get_x), self.dataset_A.df["2D_embeddings"].apply(get_y),
+        ax.scatter(
+            self.dataset_A.df["2D_embedding"].apply(get_x), self.dataset_A.df["2D_embedding"].apply(get_y),
             c=self.dataset_A.df["cluster"],
             cmap=a_color,
             s=20,
@@ -172,8 +178,8 @@ class TopolModeling:
         )
 
         # Period B
-        scatter_B = ax.scatter(
-            self.dataset_B.df["2D_embeddings"].apply(get_x), self.dataset_B.df["2D_embeddings"].apply(get_y),
+        ax.scatter(
+            self.dataset_B.df["2D_embedding"].apply(get_x), self.dataset_B.df["2D_embedding"].apply(get_y),
             c=self.dataset_B.df["cluster"],
             cmap=b_color,
             s=20,
@@ -182,24 +188,24 @@ class TopolModeling:
         )
 
         # --- Plot drift arrows ---
-        drifts = {}
-        for idx, row in self.cluster_info_B.iterrows():
+        self.drifts = {}
+        for idx, row in self.dataset_B.cluster_info.iterrows():
             cluster_id = row['Cluster']
-            if cluster_id in self.cluster_info_A['Cluster'].values:
-                centroid_A_2D = self.cluster_info_A[self.cluster_info_A['Cluster'] == cluster_id]["2D_Centroid"].values[0]
+            if cluster_id in self.dataset_A.cluster_info['Cluster'].values:
+                centroid_A_2D = self.dataset_A.cluster_info[self.dataset_A.cluster_info['Cluster'] == cluster_id]["2D_Centroid"].values[0]
                 centroid_B_2D = row["2D_Centroid"]
                 start_x, start_y = get_x(centroid_A_2D), get_y(centroid_A_2D)
                 end_x, end_y = get_x(centroid_B_2D), get_y(centroid_B_2D)
                 ax.annotate("", xy=(end_x, end_y), xytext=(start_x, start_y), arrowprops=dict(arrowstyle="->", color="black", lw=2))
-                drifts[cluster_id] = np.array(centroid_B_2D) - np.array(centroid_A_2D)
+                self.drifts[cluster_id] = np.array(centroid_B_2D) - np.array(centroid_A_2D)
             else:
-                drifts[cluster_id] = np.nan
+                self.drifts[cluster_id] = np.nan
 
         # --- Add text labels for clusters ---
-        for idx, row in self.cluster_info_A.iterrows():
+        for idx, row in self.dataset_A.cluster_info.iterrows():
             cluster_id = row['Cluster']
-            centroid_A_2D = self.cluster_info_A[self.cluster_info_A['Cluster'] == cluster_id]["2D_Centroid"].values[0]
-            centroid_B_2D = self.cluster_info_B[self.cluster_info_B['Cluster'] == cluster_id]["2D_Centroid"].values[0]
+            centroid_A_2D = self.dataset_A.cluster_info[self.dataset_A.cluster_info['Cluster'] == cluster_id]["2D_Centroid"].values[0]
+            centroid_B_2D = self.dataset_B.cluster_info[self.dataset_B.cluster_info['Cluster'] == cluster_id]["2D_Centroid"].values[0]
             start_x, start_y = get_x(centroid_A_2D), get_y(centroid_A_2D)
             end_x, end_y = get_x(centroid_B_2D), get_y(centroid_B_2D)
             ax.text(
@@ -215,10 +221,10 @@ class TopolModeling:
 
         # --- Add color bar ---
         cbar_A = fig.colorbar(
-            ScalarMappable(norm=norm_A, cmap=a_color), ax=ax, orientation="vertical", location="left", pad=0.15, ticks=all_labels
+            ScalarMappable(norm=norm_A, cmap=a_color), ax=ax, orientation="vertical", location="left", pad=0.15, ticks=all_clusters
         ); cbar_A.set_label("Cluster ID (A)", fontsize=10)
         cbar_B = fig.colorbar(
-            ScalarMappable(norm=norm_B, cmap=b_color), ax=ax, orientation="vertical", location="right", pad=0.15, ticks=all_labels
+            ScalarMappable(norm=norm_B, cmap=b_color), ax=ax, orientation="vertical", location="right", pad=0.15, ticks=all_clusters
         ); cbar_B.set_label("Cluster ID (B)", fontsize=10)
 
         # --- Final styling ---
@@ -227,13 +233,13 @@ class TopolModeling:
         ax.legend(handles=[legend_dot_A, legend_dot_B], loc="lower center", bbox_to_anchor=(0.5, -0.15), ncol=2)
         ax.set_xticks([]); ax.set_yticks([])
         ax.set_frame_on(False)
+        print("Drift computed successfully, ready to vizualize.")
         return fig, ax
 
 
     def apply_modeling(self, df_A, df_B, n_top_freq_words=20, n_repr_docs=10, n_top_tf_idf_words=20):
         self.dataset_A = Dataset(df_A)
         self.dataset_B = Dataset(df_B)
-
-        self._apply_umap()
-        self._apply_leiden()
-        self._exctract_info(n_top_freq_words, n_repr_docs, n_top_tf_idf_words)
+        self._apply_umap(); print("UMAP applied successfully.")
+        self._apply_leiden(); print("Leiden clustering applied successfully.")
+        self._exctract_info(n_top_freq_words, n_repr_docs, n_top_tf_idf_words); print("Cluster information extracted successfully.")

@@ -21,5 +21,7 @@ PyPDF2
 xlsxwriter
 openpyxl
 ratelimit
-umap
+umap-learn
 scikit-network
+openai
+google-generativeai
