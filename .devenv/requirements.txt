@@ -21,3 +21,5 @@ PyPDF2
 xlsxwriter
 openpyxl
 ratelimit
+umap
+scikit-network
