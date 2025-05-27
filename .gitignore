@@ -1,9 +1,10 @@
 .env
 
-# Ignore all files in the outputs directory
+__pycache__/
+*.pyc
+
 outputs/*
 
-# Ignore all pickle files with specific suffixes
 data/*_texts.pickle
 data/*_embeddings.pickle
 data/*_sentiments.pickle

@@ -1,0 +1,49 @@
+
+Role: You are a narrative analyst specialist in identifying all semantic perspectives in texts, so called narrative dimensions.
+Task: Identify and compare all narrative dimensions present in the texts "text1" and "text2".
+
+Narrative dimensions are fine-grained semantic elements that capture contrasts in topic, subtopic, perspective, intention, nuance, morality, emotion, sentiment, personality, intensity, solution/problem framing, accountability, or other discourse-level distinctions.
+Use the list of dimensions below as inspiration, allow the emergence of any new one, be creative and open. Only output JSON as specified.
+
+--- Dimensions ---
+#####DIMENSIONS_LIST#####
+
+For each narrative dimension, follow this output format:
+- Title: A short phrase that captures the main contrast.
+- Subtitle: The two poles of the dimension (e.g., financial stability – financial instability).
+- Presence: Indicate whether it appears in text1 only, text2 only, or both.
+- Coverage: Percentage (0–100%) indicating how much of each text is devoted to this dimension. Together, the dimensions should account for 100% of each text. Zero coverage is allowed for one text, but not both.
+- Perspective Shift: Estimate the directional change between texts as a percentage (0–100%).
+- Cosine Similarity: Indicate the cosine similarity (from –1 to 1) between the text representations for this dimension.
+- Evidence: Quote at least 2–3 representative sentences from each text that reflect each pole.
+
+Output ONLY a valid JSON list (as a string, to load it in Python) of objects in this exact format — no additional text, no commentary, no explanations, no ```json ... ```parsing.
+Example output:
+"[
+  {
+    "dimension_title": "Financial Stability",
+    "polar_extremes_subtitle": "Financial instability – Financial stability",
+    "presence": "both",
+    "coverage_text1": 60,
+    "coverage_text2": 40,
+    "difference_confidence": 40,
+    "cosine_similarity": 0.72,
+    "text1_evidence_sentences": [
+      "The company is struggling with cash flow.",
+      "Debt levels are increasing rapidly.",
+      "Investors have lost confidence."
+    ],
+    "text2_evidence_sentences": [
+      "Strong profit growth is reported.",
+      "Revenue streams are diversifying.",
+      "The market shows consistent recovery."
+    ]
+  }
+]"
+Repeat this for all narrative dimensions needed to fully account for both texts.
+
+--- Begin Text Analysis ---
+Texts in text1:
+#####TEXT1#####
+Texts in text2:
+#####TEXT2#####

@@ -9,6 +9,9 @@ plotly
 matplotlib
 seaborn
 scipy
+torch
+torchvision
+torchaudio
 tensorflow
 scikit-learn
 statsmodels
@@ -25,3 +28,5 @@ umap-learn
 scikit-network
 openai
 google-generativeai
+transformers
+sentence-transformers

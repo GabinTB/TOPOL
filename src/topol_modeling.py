@@ -60,16 +60,22 @@ class TopolModeling:
             self.dataset_B.df["2D_embedding"] = self.umap_2D_model.transform(embeddings_B).tolist()
 
     def _apply_leiden(self):
+        """
+        Apply Leiden clustering on the graph created from the UMAP embeddings of two datasets.
+        Args:
+            k (int): Number of top similar documents to consider for cross edges (only for unsupervised polarity separation).
+            filter_similarity (float): Minimum similarity threshold to consider a cross edge (only for unsupervised polarity separation).
+        """
 
         # Create graph
         if self.supervised: # Known polarity separation
             self.graph = self.umap_model.graph_
         else: # Unsupervised polarity separation
-            embeddings_A = np.stack(self.dataset_A.df["reduced_embedding"].values)
-            embeddings_B = np.stack(self.dataset_B.df["reduced_embedding"].values)
-            graph_A = self.umap_model.graph_
-            graph_B = umap.umap_.fuzzy_simplicial_set(
-                X=embeddings_B,
+            embeddings_A = np.stack(self.dataset_A.df["embedding"].values)
+            embeddings_B = np.stack(self.dataset_B.df["embedding"].values)
+            embeddings_A_B = np.concatenate((embeddings_A, embeddings_B), axis=0)
+            self.graph = umap.umap_.fuzzy_simplicial_set(
+                X=embeddings_A_B,
                 n_neighbors=self.umap_model.n_neighbors,
                 random_state=self.umap_model.random_state,
                 metric=self.umap_model.metric,
@@ -81,20 +87,34 @@ class TopolModeling:
                 local_connectivity=self.umap_model.local_connectivity,
                 verbose=False
             )[0]
+            # graph_A = self.umap_model.graph_
+            # graph_B = umap.umap_.fuzzy_simplicial_set(
+            #     X=embeddings_B,
+            #     n_neighbors=self.umap_model.n_neighbors,
+            #     random_state=self.umap_model.random_state,
+            #     metric=self.umap_model.metric,
+            #     metric_kwds=self.umap_model._metric_kwds,
+            #     knn_indices=None,
+            #     knn_dists=None,
+            #     angular=self.umap_model.angular_rp_forest,
+            #     set_op_mix_ratio=self.umap_model.set_op_mix_ratio,
+            #     local_connectivity=self.umap_model.local_connectivity,
+            #     verbose=False
+            # )[0]
 
-            sim_matrix = cosine(embeddings_B, embeddings_A)
-            # sim_matrix[sim_matrix < 0.75] = 0  
+            # sim_matrix = cosine(embeddings_B, embeddings_A)
+            # if filter_similarity is not None:
+            #     sim_matrix[sim_matrix < filter_similarity] = 0  
 
-            n_B, n_A = sim_matrix.shape
-            k = 10
-            cross_edges = lil_matrix((n_B, n_A))
-            for i in range(n_B):
-                top_k_indices = np.argpartition(sim_matrix[i], -k)[-k:]
-                cross_edges[i, top_k_indices] = sim_matrix[i, top_k_indices]
-            cross_edges = csr_matrix(cross_edges)
-            top = hstack([graph_A, cross_edges.T])
-            bottom = hstack([cross_edges, graph_B])
-            self.graph = vstack([top, bottom])
+            # n_B, n_A = sim_matrix.shape
+            # cross_edges = lil_matrix((n_B, n_A))
+            # for i in range(n_B):
+            #     top_k_indices = np.argpartition(sim_matrix[i], -k)[-k:]
+            #     cross_edges[i, top_k_indices] = sim_matrix[i, top_k_indices]
+            # cross_edges = csr_matrix(cross_edges)
+            # top = hstack([graph_A, cross_edges.T])
+            # bottom = hstack([cross_edges, graph_B])
+            # self.graph = vstack([top, bottom])
 
         # Apply Leiden clustering on the network
         self.adjacency_matrix = csr_matrix(self.graph)
@@ -236,7 +256,8 @@ class TopolModeling:
         return fig, ax
 
 
-    def apply_modeling(self, df_A, df_B, n_top_freq_words=20, n_repr_docs=10, n_top_tf_idf_words=20):
+    def apply_modeling(self, df_A, df_B,
+                       n_top_freq_words=20, n_repr_docs=10, n_top_tf_idf_words=20):
         self.dataset_A = Dataset(df_A)
         self.dataset_B = Dataset(df_B)
         self._apply_umap(); print("UMAP applied successfully.")

@@ -16,27 +16,23 @@ eval "$(conda shell.bash hook)"; echo "Conda shell initialized!"
 
 echo "Checking if conda is installed and proceeding with installations..."
 if [ -d "$ENV_PATH" ]; then
-    echo "Conda environment '$ENV_NAME' already exists. Skipping environment creation but updating it..."
-    conda activate $ENV_NAME
-    pip install --upgrade pip; echo "pip upgraded!"
-    pip install --no-cache-dir -r .devenv/requirements.txt; echo "Dependencies installed!"
+    echo "Conda environment '$ENV_NAME' already exists. Skipping environment creation."
 
 else
     echo "Creating conda environment '$ENV_NAME' with Python $PYTHON_VERSION..."
     mamba create -n $ENV_NAME python=$PYTHON_VERSION -y; echo "Conda environment '$ENV_NAME' created with Python version $PYTHON_VERSION!"
-    conda activate $ENV_NAME
 fi
+
+conda activate $ENV_NAME
 
 if [[ "$CONDA_DEFAULT_ENV" == "$ENV_NAME" ]]; then
     echo "!!! Conda environment '$ENV_NAME' is activated, continuing with setup !!!"
 
-    pip install --upgrade pip; echo "pip upgraded!"
-    
-    echo "Installing PyTorch, torchvision, and torchaudio from conda-forge..."
-    mamba install -n $ENV_NAME pytorch torchvision torchaudio -c pytorch -c conda-forge -y
-
-    pip install --upgrade pip; echo "pip upgraded!"
-    pip install --no-cache-dir -r .devenv/requirements.txt; echo "Dependencies installed!"
+    pip3 install --upgrade pip; echo "pip upgraded!"
+    pip3 install --no-cache-dir -r .devenv/requirements.txt
+    pip3 install -U 'spacy[apple]'
+    # pip3 install -U 'spacy[cuda12x]'
+    echo "Dependencies installed!"
 else
     echo "!!! Conda environment '$ENV_NAME' is not activated, failed to install deps... !!!"
 fi
