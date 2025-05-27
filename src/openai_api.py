@@ -17,7 +17,7 @@ OPENAI_CLIENT = OpenAI(api_key=OPENAI_KEY)
 def make_chat_completion(client: OpenAI, rpm: int=500, default_model: str="gpt-4o-mini-2024-07-18") -> callable:
     @rate_limit(calls_per_minute=rpm)
     def chat_completion(prompt: str, model: str = default_model, temperature: float = 0.7,
-                        max_tokens: int = 100, verbose: bool = True) -> str:
+                        max_tokens: int = 50000, verbose: bool = True) -> str:
         try:
             response = client.chat.completions.create(
                 model=model,

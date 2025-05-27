@@ -8,6 +8,7 @@ from matplotlib.cm import ScalarMappable
 import umap
 from umap import UMAP
 from sknetwork.clustering import Leiden
+
 from scipy.sparse import csr_matrix
 from scipy.sparse import lil_matrix
 from scipy.sparse import block_diag, hstack, vstack
@@ -23,7 +24,6 @@ class Dataset(object):
         assert "text" in df.columns, "Dataframe must contain a 'text' column."
         assert "embedding" in df.columns, "Dataframe must contain an 'embedding' column."
         self.df = df.copy()
-        self.df["reduced_embedding"] = None
         self.df["2D_embedding"] = None
         self.df["cluster"] = None
         self.df["cluster_prob"] = None
@@ -31,8 +31,10 @@ class Dataset(object):
 
 class TopolModeling:
     def __init__(self, n_components, umap_model_params, leiden_model_params, vectorizer_model, supervised=False):
-        self.umap_model = UMAP(n_components=n_components, **umap_model_params)
-        self.umap_2D_model = UMAP(n_components=2, **umap_model_params)
+        if "transform_mode" in umap_model_params and umap_model_params["transform_mode"] != "graph":
+            Warning("UMAP transform_mode will be overridden to 'graph' for Leiden clustering (and 'embedding' for vizualiser).")
+        self.umap_model = UMAP(n_components=n_components, transform_mode="graph", **umap_model_params)
+        self.umap_2D_model = UMAP(n_components=2, transform_mode="embedding", **umap_model_params)
         self.leiden_model = Leiden(**leiden_model_params)
         self.vectorizer_model = vectorizer_model
         self.supervised = supervised
@@ -47,16 +49,13 @@ class TopolModeling:
 
         if self.supervised: # Known polarity separation
             embeddings_A_B = np.concatenate((embeddings_A, embeddings_B), axis=0)
-            reduced_embeddings_A_B = self.umap_model.fit_transform(embeddings_A_B)
+            self.umap_model.fit(embeddings_A_B)
             reduced_2D_embeddings_A_B = self.umap_2D_model.fit_transform(embeddings_A_B)
-            self.dataset_A.df["reduced_embedding"] = reduced_embeddings_A_B[:len(embeddings_A)].tolist()
             self.dataset_A.df["2D_embedding"] = reduced_2D_embeddings_A_B[:len(embeddings_A)].tolist()
-            self.dataset_B.df["reduced_embedding"] = reduced_embeddings_A_B[len(embeddings_A):].tolist()
             self.dataset_B.df["2D_embedding"] = reduced_2D_embeddings_A_B[len(embeddings_A):].tolist()
-        else: # Unsupervised polarity separation
-            self.dataset_A.df["reduced_embedding"] = self.umap_model.fit_transform(embeddings_A).tolist()
+        else:               # Unsupervised polarity separation
+            self.umap_model.fit(embeddings_A)
             self.dataset_A.df["2D_embedding"] = self.umap_2D_model.fit_transform(embeddings_A).tolist()
-            self.dataset_B.df["reduced_embedding"] = self.umap_model.transform(embeddings_B).tolist()
             self.dataset_B.df["2D_embedding"] = self.umap_2D_model.transform(embeddings_B).tolist()
 
     def _apply_leiden(self):
@@ -70,54 +69,32 @@ class TopolModeling:
         # Create graph
         if self.supervised: # Known polarity separation
             self.graph = self.umap_model.graph_
-        else: # Unsupervised polarity separation
-            embeddings_A = np.stack(self.dataset_A.df["embedding"].values)
-            embeddings_B = np.stack(self.dataset_B.df["embedding"].values)
-            embeddings_A_B = np.concatenate((embeddings_A, embeddings_B), axis=0)
-            self.graph = umap.umap_.fuzzy_simplicial_set(
-                X=embeddings_A_B,
-                n_neighbors=self.umap_model.n_neighbors,
-                random_state=self.umap_model.random_state,
-                metric=self.umap_model.metric,
-                metric_kwds=self.umap_model._metric_kwds,
-                knn_indices=None,
-                knn_dists=None,
-                angular=self.umap_model.angular_rp_forest,
-                set_op_mix_ratio=self.umap_model.set_op_mix_ratio,
-                local_connectivity=self.umap_model.local_connectivity,
-                verbose=False
-            )[0]
-            # graph_A = self.umap_model.graph_
-            # graph_B = umap.umap_.fuzzy_simplicial_set(
-            #     X=embeddings_B,
-            #     n_neighbors=self.umap_model.n_neighbors,
-            #     random_state=self.umap_model.random_state,
-            #     metric=self.umap_model.metric,
-            #     metric_kwds=self.umap_model._metric_kwds,
-            #     knn_indices=None,
-            #     knn_dists=None,
-            #     angular=self.umap_model.angular_rp_forest,
-            #     set_op_mix_ratio=self.umap_model.set_op_mix_ratio,
-            #     local_connectivity=self.umap_model.local_connectivity,
-            #     verbose=False
-            # )[0]
-
-            # sim_matrix = cosine(embeddings_B, embeddings_A)
-            # if filter_similarity is not None:
-            #     sim_matrix[sim_matrix < filter_similarity] = 0  
-
-            # n_B, n_A = sim_matrix.shape
-            # cross_edges = lil_matrix((n_B, n_A))
-            # for i in range(n_B):
-            #     top_k_indices = np.argpartition(sim_matrix[i], -k)[-k:]
-            #     cross_edges[i, top_k_indices] = sim_matrix[i, top_k_indices]
-            # cross_edges = csr_matrix(cross_edges)
-            # top = hstack([graph_A, cross_edges.T])
-            # bottom = hstack([cross_edges, graph_B])
-            # self.graph = vstack([top, bottom])
+            self.adjacency_matrix = csr_matrix(self.graph)
+        else:               # Unsupervised polarity separation
+            graph_A = self.umap_model.graph_
+            graph_B = self.umap_model.transform(np.stack(self.dataset_B.df["embedding"].values))
+            self.adjacency_matrix = vstack(
+                [
+                    hstack([ graph_A, graph_B.transpose() ]),
+                    hstack([ graph_B, csr_matrix((graph_B.shape[0], graph_B.shape[0])) ])
+                ]
+            )
+            # --------------------
+            # |           |       |
+            # |           |       |
+            # |     A     |   B'  |
+            # |           |       |
+            # |           |       |
+            # ---------------------
+            # |           |       |
+            # |     B     |   0   |
+            # |           |       |
+            # ---------------------
+            # where A is the graph of dataset A, B is the graph of dataset B, and B' is the transformed graph of dataset B.
+            # where 0 is simply the all zero matrix (since there are no edges among the test samples).
+            # Source: https://github.com/lmcinnes/umap/discussions/615
 
         # Apply Leiden clustering on the network
-        self.adjacency_matrix = csr_matrix(self.graph)
         labels_A_B = self.leiden_model.fit_predict(self.adjacency_matrix)
         probs_A_B = self.leiden_model.predict_proba()
         self.dataset_A.df["cluster"] = labels_A_B[:len(self.dataset_A.df)]
