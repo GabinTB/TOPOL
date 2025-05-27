@@ -49,15 +49,15 @@ class TopolModeling:
             embeddings_A_B = np.concatenate((embeddings_A, embeddings_B), axis=0)
             reduced_embeddings_A_B = self.umap_model.fit_transform(embeddings_A_B)
             reduced_2D_embeddings_A_B = self.umap_2D_model.fit_transform(embeddings_A_B)
-            self.dataset_A.df["reduced_embedding"] = embeddings_A_B[:len(embeddings_A)]
-            self.dataset_A.df["2D_embedding"] = reduced_2D_embeddings_A_B[:len(embeddings_A)]
-            self.dataset_B.df["reduced_embedding"] = embeddings_A_B[len(embeddings_A):]
-            self.dataset_B.df["2D_embedding"] = reduced_2D_embeddings_A_B[len(embeddings_A):]
+            self.dataset_A.df["reduced_embedding"] = reduced_embeddings_A_B[:len(embeddings_A)].tolist()
+            self.dataset_A.df["2D_embedding"] = reduced_2D_embeddings_A_B[:len(embeddings_A)].tolist()
+            self.dataset_B.df["reduced_embedding"] = reduced_embeddings_A_B[len(embeddings_A):].tolist()
+            self.dataset_B.df["2D_embedding"] = reduced_2D_embeddings_A_B[len(embeddings_A):].tolist()
         else: # Unsupervised polarity separation
-            self.dataset_A.df["reduced_embedding"] = self.umap_model.fit_transform(embeddings_A)
-            self.dataset_A.df["2D_embedding"] = self.umap_2D_model.fit_transform(embeddings_A)
-            self.dataset_B.df["reduced_embedding"] = self.umap_model.transform(embeddings_B)
-            self.dataset_B.df["2D_embedding"] = self.umap_2D_model.transform(embeddings_B)
+            self.dataset_A.df["reduced_embedding"] = self.umap_model.fit_transform(embeddings_A).tolist()
+            self.dataset_A.df["2D_embedding"] = self.umap_2D_model.fit_transform(embeddings_A).tolist()
+            self.dataset_B.df["reduced_embedding"] = self.umap_model.transform(embeddings_B).tolist()
+            self.dataset_B.df["2D_embedding"] = self.umap_2D_model.transform(embeddings_B).tolist()
 
     def _apply_leiden(self):
 
@@ -104,7 +104,6 @@ class TopolModeling:
         self.dataset_A.df["cluster_prob"] = probs_A_B[:len(self.dataset_A.df)]
         self.dataset_B.df["cluster"] = labels_A_B[len(self.dataset_A.df):]
         self.dataset_B.df["cluster_prob"] = probs_A_B[len(self.dataset_A.df):]
-
 
     def _create_cluster_info(self, df, n_top_freq_words, n_repr_docs):
         cluster_info = pd.DataFrame({"Cluster": np.unique(df['cluster'])})
@@ -168,7 +167,7 @@ class TopolModeling:
 
         # --- Plot document embeddings ---
         # Period A
-        ax.scatter(
+        scatter_A = ax.scatter(
             self.dataset_A.df["2D_embedding"].apply(get_x), self.dataset_A.df["2D_embedding"].apply(get_y),
             c=self.dataset_A.df["cluster"],
             cmap=a_color,
@@ -178,7 +177,7 @@ class TopolModeling:
         )
 
         # Period B
-        ax.scatter(
+        scatter_B = ax.scatter(
             self.dataset_B.df["2D_embedding"].apply(get_x), self.dataset_B.df["2D_embedding"].apply(get_y),
             c=self.dataset_B.df["cluster"],
             cmap=b_color,

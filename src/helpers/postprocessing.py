@@ -1,4 +1,7 @@
 import numpy as np
+import json
+import re
+import ast
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 from sklearn.metrics.pairwise import cosine_similarity as cosine
 
@@ -36,3 +39,41 @@ def get_tf_idf_top_n_words(documents: list, vectorizer_model: CountVectorizer, n
         top_n_indices = sorted_indices[i, :n]
         top_n_words.append({feature_names[idx]: X_tfidf[i, idx] for idx in top_n_indices})
     return top_n_words
+
+def from_list_to_string(texts_list):
+    # return '- \n\t'.join(texts_list)
+    stringified_list = ""
+    for i, text in enumerate(texts_list):
+        if i == 0:
+            stringified_list += f'\t- "{text}"'
+        else:
+            stringified_list += f'\n\t- "{text}"'
+    return stringified_list
+
+def safe_json_load(raw_response_text):
+    # Strip leading/trailing whitespace and remove non-JSON "explanation" text if any
+    raw_text = raw_response_text.strip()
+
+    # Attempt quick fix: if it starts/ends with JSON brackets
+    if not raw_text.startswith('[') and '[' in raw_text:
+        raw_text = raw_text[raw_text.index('['):]
+    if not raw_text.endswith(']') and ']' in raw_text:
+        raw_text = raw_text[:raw_text.rindex(']') + 1]
+
+    # Remove or escape invalid escape characters
+    def escape_invalid_escapes(s):
+        # Fix invalid escape sequences: \x, \u (if malformed), or backslashes not part of valid escape
+        s = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', s)  # Replace lone backslashes
+        return s
+
+    try:
+        return json.loads(escape_invalid_escapes(raw_text))
+    except json.JSONDecodeError as e:
+        try:
+            # Try ast.literal_eval as fallback (tolerates single quotes, trailing commas)
+            return ast.literal_eval(raw_text)
+        except Exception as fallback_error:
+            print("⚠️ JSON parsing failed.")
+            print("JSON error:", e)
+            print("Fallback error:", fallback_error)
+            return None
