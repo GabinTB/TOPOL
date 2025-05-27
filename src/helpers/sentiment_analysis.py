@@ -24,9 +24,7 @@ class SentimentModel:
         
         Args:
             text (str): Input text.
-            tokenizer: HuggingFace tokenizer.
             max_length (int): Max number of tokens per chunk.
-            length_delta (int): Security margin for the chunk length (optional).
             stride (int): Overlap between chunks (optional).
         
         Returns:
@@ -46,6 +44,7 @@ class SentimentModel:
             start_offset = offsets[start][0]
             end_offset = offsets[end - 1][1]
             chunk_text = text[start_offset:end_offset]
+            print(len(chunk_text), start_offset, end_offset, start, end, len(input_ids))
             chunks.append(chunk_text)
 
         return chunks
