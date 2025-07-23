@@ -3,7 +3,6 @@ import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline
 
 
-
 class SentimentModel:
     def __init__(self, model_name="tabularisai/multilingual-sentiment-analysis", device=-1, max_lenghth=None, n_special_tokens=None):
         # model = AutoModelForSequenceClassification.from_pretrained(model_name) # Always use CPU for pipeline creation
@@ -84,7 +83,7 @@ class SentimentModel:
             return sentiment
 
     def get_sentiment_score(self, sentiment):
-        p_pos = sentiment["positive"]# if "very positive" not in sentiment else sentiment["very positive"] + sentiment["positive"]
-        p_neg = sentiment["negative"]# if "very negative" not in sentiment else sentiment["very negative"] + sentiment["negative"]
+        p_pos = sentiment["positive"] # if "very positive" not in sentiment else sentiment["very positive"] + sentiment["positive"]
+        p_neg = sentiment["negative"] # if "very negative" not in sentiment else sentiment["very negative"] + sentiment["negative"]
         p_neu = sentiment["neutral"]
         return (p_pos - p_neg) / (p_pos + p_neg + p_neu)

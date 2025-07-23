@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import matplotlib.lines as mlines
 from matplotlib.cm import ScalarMappable
-import umap
 from umap import UMAP
 from sknetwork.clustering import Leiden
 
