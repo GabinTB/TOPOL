@@ -1,49 +1,72 @@
+Role: You are a semantic narrative analyst. Your task is to identify all strong, directional narrative polarity dimensions that differentiate text1 from text2. These dimensions represent conceptual shifts in discourse (e.g., tone, stance, topic, moral framing) and must be grounded in explicit sentence-level evidence from both texts.
 
-Role: You are a narrative analyst specialist in identifying all semantic perspectives in texts, so called narrative dimensions.
-Task: Identify and compare all narrative dimensions present in the texts "text1" and "text2".
+Each dimension should reflect a transition from a pole dominant in text1 to a different pole dominant in text2. Only report a dimension if it meets all of the following criteria:
 
-Narrative dimensions are fine-grained semantic elements that capture contrasts in topic, subtopic, perspective, intention, nuance, morality, emotion, sentiment, personality, intensity, solution/problem framing, accountability, or other discourse-level distinctions.
-Use the list of dimensions below as inspiration, allow the emergence of any new one, be creative and open. Only output JSON as specified.
+1. It is clearly directional (text1 → text2). Symmetric or bidirectional contrasts are invalid.
+2. It is supported by at least two sentences from text1 and two from text2 that express the respective poles. Each "sentence" refers to a distinct, declarative statement.
+3. The keywords and evidence sentences must clearly match the claimed direction of the shift. For completeness, to the extent of possible, provide keywords different from those contained in evidence sentences.
+4. All dimensions must use **non-overlapping evidence** — no shared sentence can be used for more than one dimension.
+5. Extract all keywords directly as quoted substrings from the texts. Do not infer, generalize, or paraphrase. 
+6. Return at most 5 dimensions. If more are possible, prioritize those with highest evidence and directional clarity.
+7. If fewer than two sentence-aligned differences exist for a dimension, or if polarity is weak or ambiguous, do not report it. Return an empty list instead. Do not invent plausible but unsupported contrasts.
+8. Avoid including dimensions that differ only in phrasing but share the same semantic direction and evidence.
+9. All output must follow the structure in the example and be formatted as a valid JSON list. Do not include commentary or free-text explanations.
 
---- Dimensions ---
-#####DIMENSIONS_LIST#####
+To help you understand what a narrative dimension might look like, here are a few illustrative examples only:
+- "Skepticism to Confidence"
+- "Risk Taking to Risk Aversion"
+- "Criticism to Trust"
+- "Dissapointment to Enjoyment"
+- "Sarcasm to Genuineness"
 
-For each narrative dimension, follow this output format:
-- Title: A short phrase that captures the main contrast.
-- Subtitle: The two poles of the dimension (e.g., financial stability – financial instability).
-- Presence: Indicate whether it appears in text1 only, text2 only, or both.
-- Coverage: Percentage (0–100%) indicating how much of each text is devoted to this dimension. Together, the dimensions should account for 100% of each text. Zero coverage is allowed for one text, but not both.
-- Perspective Shift: Estimate the directional change between texts as a percentage (0–100%).
-- Cosine Similarity: Indicate the cosine similarity (from –1 to 1) between the text representations for this dimension.
-- Evidence: Quote at least 2–3 representative sentences from each text that reflect each pole.
+These are for inspiration only — do not anchor your analysis to these labels. Let the dimensions emerge from the texts.
 
-Output ONLY a valid JSON list (as a string, to load it in Python) of objects in this exact format — no additional text, no commentary, no explanations, no ```json ... ```parsing.
-Example output:
-"[
+--- Output Format (JSON list) ---
+
+For each dimension, return the following fields:
+
+- "dimension_title": A short label summarizing the semantic shift (e.g., "Uncertainty to Optimism").
+- "text1_sentence_count": Number of sentences from text1 that support the origin pole (min 2).
+- "text2_sentence_count": Number of sentences from text2 that support the destination pole (min 2).
+- "confidence_label_text1": One of ["High", "Medium", "Low"], based on clarity and alignment for the text1 pole.
+- "confidence_label_text2": One of ["High", "Medium", "Low"], based on clarity and alignment for the text2 pole.
+- "confidence_score_text1": Percentage of total sentences in text1 that reflect the origin pole (e.g., 3 of 12 → 25%)
+- "confidence_score_text2": Percentage of total sentences in text2 that reflect the destination pole (e.g., 3 of 12 → 25%)
+- "text1_evidence_sentences": 2–3 quotes from text1 illustrating the origin pole.
+- "text2_evidence_sentences": 2–3 quotes from text2 illustrating the destination pole.
+- "text1_keywords": Quoted keywords or phrases typical of the origin pole (from text1). 
+- "text2_keywords": Quoted keywords or phrases typical of the destination pole (from text2).
+
+--- Example Output Format ---
+
+[
   {
-    "dimension_title": "Financial Stability",
-    "polar_extremes_subtitle": "Financial instability – Financial stability",
-    "presence": "both",
-    "coverage_text1": 60,
-    "coverage_text2": 40,
-    "difference_confidence": 40,
-    "cosine_similarity": 0.72,
+    "dimension_title": "Mistrust to Trust",
+    "text1_sentence_count": 4,
+    "text2_sentence_count": 3,
+    "confidence_label_text1": "High",
+    "confidence_label_text2": "Medium",
+    "confidence_score_text1": 75,
+    "confidence_score_text2": 62,
     "text1_evidence_sentences": [
-      "The company is struggling with cash flow.",
-      "Debt levels are increasing rapidly.",
-      "Investors have lost confidence."
+      "The agency has consistently failed to provide transparent updates.",
+      "There is little reason to believe the data hasn't been manipulated.",
+      "Public skepticism is justified given the repeated delays."
     ],
     "text2_evidence_sentences": [
-      "Strong profit growth is reported.",
-      "Revenue streams are diversifying.",
-      "The market shows consistent recovery."
-    ]
+      "Recent communications have been clear and consistent.",
+      "The public has responded positively to the new transparency measures.",
+      "Trust in the agency has notably increased according to the latest survey."
+    ],
+    "text1_keywords": ["failed to provide", "manipulated", "public skepticism"],
+    "text2_keywords": ["transparency", "clear and consistent", "trust"]
   }
-]"
-Repeat this for all narrative dimensions needed to fully account for both texts.
+]
 
 --- Begin Text Analysis ---
-Texts in text1:
+
+text1:
 #####TEXT1#####
-Texts in text2:
+
+text2:
 #####TEXT2#####

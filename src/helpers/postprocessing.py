@@ -1,4 +1,5 @@
 import numpy as np
+import polars as pl
 import json
 import re
 import ast
@@ -11,21 +12,32 @@ TF_IDF_N_WORDS = 20
 N_GRAMS_RANGE = (1, 2)
 MAX_FEATURES = 10000
 
+def get_top_k_representative_docs(cb_cluster_info, cb_df, k=5):
+    top_k_docs = []
+    for row in cb_cluster_info.iter_rows(named=True):
+        centroid = row["centroid"]
+        cluster_id = row["cluster"]
+        cluster_df = cb_df.filter(pl.col("cluster") == cluster_id)
+        embeddings = cluster_df["embedding"].to_list()
+        similarities = cosine([centroid], embeddings)[0]
+        documents = cluster_df["text"].to_list()
+        docs_sim_dict = { doc: sim for doc, sim in zip(documents, similarities) }
+        sorted_docs = sorted(docs_sim_dict.items(), key=lambda x: x[1], reverse=True)
+        top_k_docs_texts = [doc for doc, sim in sorted_docs[:k]]
+        top_k_similarities = [sim for doc, sim in sorted_docs[:k]]
+        top_k_docs.append({
+            "cluster": cluster_id,
+            "top_docs": top_k_docs_texts,
+            "similarities": top_k_similarities
+        })
+    return pl.DataFrame(top_k_docs)
+
 def get_top_n_words(documents: list, vectorizer_model: CountVectorizer, n: int=10) -> dict:
     words = vectorizer_model.fit_transform(documents)
-    words_freq = words.sum(axis=0).A1
+    words_freq = words.sum(axis=0)
     words_freq = [(word, words_freq[idx]) for word, idx in vectorizer_model.vocabulary_.items()]
     words_freq = sorted(words_freq, key=lambda x: x[1], reverse=True)
     return dict(words_freq[:n])
-
-def get_top_n_representative_documents(documents: list, embeddings: list, centroid: np.array, n: int=10) -> list:
-    assert len(documents) == len(embeddings) > 0, "Documents and embeddings must have the same length."
-    assert centroid.shape[0] == embeddings[0].shape[0], f"Centroid and embeddings must have the same dimensionality: {centroid.shape[0]} != {embeddings[0].shape[0]}"
-    sim_matrix = cosine(embeddings, centroid.reshape(1, -1))
-    sim_matrix = sim_matrix.ravel()
-    sorted_indices = np.argsort(sim_matrix)[::-1]
-    top_n_indices = sorted_indices[:min(len(sorted_indices), n)]
-    return [documents[i] for i in top_n_indices]
 
 def get_tf_idf_top_n_words(documents: list, vectorizer_model: CountVectorizer, n: int=10):
     doc_strings = documents

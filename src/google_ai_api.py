@@ -16,7 +16,7 @@ GGENAI_CLIENT = OpenAI(
 )
 
 
-chat_completion: callable = make_chat_completion(GGENAI_CLIENT, rpm=15, default_model="gemini-2.0-flash")
+chat_completion: callable = make_chat_completion(GGENAI_CLIENT, rpm=15, default_model="gemini-2.5-flash")
 
 
 class GoogleAIEmbedding(OpenAIEmbedding):
